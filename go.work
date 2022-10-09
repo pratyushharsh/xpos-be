@@ -1,0 +1,10 @@
+go 1.19
+
+use (
+	./cdk-app
+	./local
+	./go-lambda-func/service
+	./go-lambda-func/create-new-business
+	./go-lambda-func/get-business-by-id
+	./go-lambda-func/update-business
+)
