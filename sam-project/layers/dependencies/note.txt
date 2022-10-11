@@ -1,0 +1,3 @@
+While building the zip for image compression use the following commabg to bulf sharp dependency for linux.
+rm -rf node_modules/sharp
+SHARP_IGNORE_GLOBAL_LIBVIPS=1 npm install --arch=x64 --platform=linux sharp

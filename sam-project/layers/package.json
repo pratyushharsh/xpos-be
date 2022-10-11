@@ -1,0 +1,10 @@
+{
+  "name": "layers",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "deploy": "sam build && sam deploy --config-file=samconfig.toml --config-env=dev"
+  },
+  "author": "Pratyush Harsh",
+  "license": "ISC"
+}

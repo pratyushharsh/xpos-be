@@ -1,0 +1,13 @@
+version=0.1
+
+[dev.global.parameters]
+stack_name = "XPOSLayerStack"
+
+[dev.deploy.parameters]
+region = "ap-south-1"
+s3_bucket = "xpos-dev"
+tags = "application=\"XPOS\" created_by=\"aws-sam\" owner=\"xpos\""
+template-file = "layers.yaml"
+
+[default.build.parameters]
+template_file = "layers.yaml"

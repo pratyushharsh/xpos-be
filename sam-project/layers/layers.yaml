@@ -1,0 +1,19 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Contains Dependencies and Layers functions
+
+Resources:
+  XPOSDependencyLayer:
+    Type: AWS::Serverless::LayerVersion
+    Properties:
+      LayerName: XPOSDependencyLayer
+      ContentUri: dependencies/
+      CompatibleRuntimes:
+        - nodejs14.x
+      RetentionPolicy: Delete
+
+Outputs:
+  XPOSDependencyLayerOutput:
+    Description: Dependencies for hr interfaces
+    Value: !Ref XPOSDependencyLayer

@@ -85,7 +85,6 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 	role := awsiam.Role_FromRoleName(userStack, jsii.String("Role"), props.RoleName, &awsiam.FromRoleNameOptions{
 		Mutable: jsii.Bool(false),
 	})
-
 	/* Lambda Function to handle the custom authentication for
 	   OTP Login using aws
 	*/
