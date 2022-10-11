@@ -7,4 +7,9 @@ use (
 	./go-lambda-func/create-new-business
 	./go-lambda-func/get-business-by-id
 	./go-lambda-func/update-business
+	./go-lambda-func/get-employee-from-business
+	./go-lambda-func/create-new-employee
+	./go-lambda-func/get-employee-from-business-by-id
+	./go-lambda-func/get-business-for-user
+	./go-lambda-func/update-employee
 )

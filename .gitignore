@@ -3,3 +3,5 @@
 cdk.out
 node_modules
 .aws-sam
+
+.env

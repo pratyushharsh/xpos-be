@@ -3,12 +3,21 @@ package main
 import (
 	"context"
 	f1 "create-new-business/src"
+	f5 "create-new-employee/src"
+	"fmt"
 	f2 "get-business-by-id/src"
+	f7 "get-business-for-user/src"
+	f6 "get-employee-from-business-by-id/src"
+	f4 "get-employee-from-business/src"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
 	f3 "update-business/src"
+	f8 "update-employee/src"
 )
 
 type LambdaApiRequest func(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)
@@ -66,14 +75,27 @@ func urlMappings() {
 	router.POST("/business", WrapLambdaFunction(f1.CreateBusinessHandler))
 	router.GET("/business/:businessId", WrapLambdaFunction(f2.GetBusinessByIdHandler))
 	router.PUT("/business/:businessId", WrapLambdaFunction(f3.UpdateBusinessHandler))
-	//router.GET("/business/:businessId/user", WrapLambdaFunction(user.GetUserForStoreHandler))
-	//router.POST("/business/:businessId/user", WrapLambdaFunction(user.CreateNewStoreEmployee))
-	//router.GET("/business/:businessId/user/:userid", WrapLambdaFunction(user.GetEmployeeFromStoreById))
-	//router.PUT("/user/:userid", WrapLambdaFunction(user.UpdateEmployeeHandler))
-	//router.GET("/user/:userid/business", WrapLambdaFunction(user.GetBusinessForUserHandler))
+	router.GET("/business/:businessId/user", WrapLambdaFunction(f4.GetEmployeeFromBusinessHandler))
+	router.POST("/business/:businessId/user", WrapLambdaFunction(f5.CreateNewBusinessEmployee))
+	router.GET("/business/:businessId/user/:userid", WrapLambdaFunction(f6.GetEmployeeFromBusinessById))
+	router.GET("/user/:userid/business", WrapLambdaFunction(f7.GetBusinessForUserHandler))
+	router.PUT("/user/:userid", WrapLambdaFunction(f8.UpdateEmployeeHandler))
+}
+
+func init() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	} else {
+		log.Println("Loaded .env file")
+	}
+
 }
 
 func StartApplication() {
+	fmt.Println(os.Getenv("GIN_MODE"))
+	fmt.Println(os.Getenv("PROJECT_NAME"))
+	//gin.SetMode(os.Getenv("GIN_MODE"))
 	router = gin.Default()
 	urlMappings()
 

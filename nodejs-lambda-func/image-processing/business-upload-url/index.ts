@@ -7,6 +7,7 @@ let docClient = new AWS.DynamoDB.DocumentClient({apiVersion: '2012-08-10'});
 
 const URL_EXPIRATION_SECONDS = process.env.URL_EXPIRATION_TIME || 300
 const IMAGE_IMAGE_BUCKET = process.env.IMAGE_IMAGE_BUCKET
+const BUCKET_PREFIX = process.env.BUCKET_PREFIX || 'raw'
 
 
 async function checkIfBusinessExist(businessId: string) {
@@ -33,7 +34,7 @@ async function checkIfBusinessExist(businessId: string) {
 exports.handler = async (event: APIGatewayProxyEventV2) => {
 
     const { businessId } = event.pathParameters!
-    const Key = `raw/${businessId}/LOGO.jpg`
+    const Key = `${BUCKET_PREFIX}/${businessId}/LOGO.jpg`
 
 
     // Check if the business exist

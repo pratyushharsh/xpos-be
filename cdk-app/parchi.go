@@ -7,6 +7,8 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	awscdklambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awss3notifications"
 	awscdklambdago "github.com/aws/aws-cdk-go/awscdklambdagoalpha/v2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -16,6 +18,7 @@ const ProjectName = "XPOS"       // USE 3-5 Digit Capital Letters
 const ProjectEnvironment = "DEV" // USE Capital letters
 const ProjectVersion = "0.0.1"
 const ProjectDescription = "XPOS"
+const ProjectTag = ProjectName + "-" + ProjectEnvironment
 
 const ProjectPrefix = ProjectName + "-" + ProjectEnvironment + "-"
 const StackPrefix = ProjectName + "-"
@@ -36,6 +39,19 @@ func main() {
 	NewUserStack(app, StackPrefix+"UserStack", &UserStackProps{
 		StackProps: awscdk.StackProps{
 			Env: env(),
+			Tags: &map[string]*string{
+				"Project": jsii.String(ProjectTag),
+			},
+		},
+		RoleName: globalRole,
+	})
+
+	NewBusinessStack(app, StackPrefix+"BusinessStack", &BusinessStackProps{
+		StackProps: awscdk.StackProps{
+			Env: env(),
+			Tags: &map[string]*string{
+				"Project": jsii.String(ProjectTag),
+			},
 		},
 		RoleName: globalRole,
 	})
@@ -149,7 +165,7 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 
 type BusinessStackProps struct {
 	awscdk.StackProps
-	Role awsiam.IRole
+	RoleName *string
 }
 
 func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStackProps) awscdk.Stack {
@@ -159,39 +175,59 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 	}
 	businessStack := awscdk.NewStack(scope, &id, &stackProps)
 
-	getBusinessByIdLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String("DevXPOSGetBusinessById"), &awscdklambdago.GoFunctionProps{
-		FunctionName: jsii.String("DevXPOSGetBusinessById"),
-		Description:  jsii.String("Get Business Detail By ID"),
-		Entry:        jsii.String("../go-lambda-func/get-business-by-id"),
-		Role:         props.Role,
-		Runtime:      awslambda.Runtime_GO_1_X(),
-		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
-	})
-
-	createNewBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String("DevXPOSCreateNewBusinessLambda"), &awscdklambdago.GoFunctionProps{
-		FunctionName: jsii.String("DevXPOSCreateNewBusinessLambda"),
-		Description:  jsii.String("Create New Business for the application"),
-		Entry:        jsii.String("../go-lambda-func/create-new-business"),
-		Role:         props.Role,
-		Runtime:      awslambda.Runtime_GO_1_X(),
-		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
-	})
-
-	updateBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String("DevXPOSUpdateBusinessLambda"), &awscdklambdago.GoFunctionProps{
-		FunctionName: jsii.String("DevXPOSUpdateBusinessLambda"),
-		Description:  jsii.String("Update Business Detail."),
-		Entry:        jsii.String("../go-lambda-func/update-business"),
-		Role:         props.Role,
-		Runtime:      awslambda.Runtime_GO_1_X(),
-		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
+	// Role that needs to be attached to the lambda function
+	role := awsiam.Role_FromRoleName(businessStack, jsii.String("Role"), props.RoleName, &awsiam.FromRoleNameOptions{
+		Mutable: jsii.Bool(false),
 	})
 
 	// @TODO If API ID is present then use the existing api or create a new api.
 	restApi := awscdkrest.NewRestApi(businessStack, jsii.String("XPOS-POC"), &awscdkrest.RestApiProps{
 		Deploy: jsii.Bool(false),
+	})
+
+	lambdaLayers := awslambda.LayerVersion_FromLayerVersionArn(businessStack, jsii.String(ProjectPrefix+"DependencyLayer"), jsii.String("arn:aws:lambda:ap-south-1:189468856814:layer:XPOSDependencyLayer:3"))
+	//lambdaLayers := awslambda.NewLayerVersion(businessStack, jsii.String("MyLayer"), &awslambda.LayerVersionProps{
+	//  	RemovalPolicy: awscdk.RemovalPolicy_RETAIN,
+	//  	Code: awslambda.AssetCode,
+	//  	compatibleArchitectures: []architecture{
+	//  		lambda.*architecture_X86_64(),
+	//  		lambda.*architecture_ARM_64(),
+	//  	},
+	//  })
+
+	lambdaEnvironmentVariable := &map[string]*string{
+		"DBTable":         jsii.String("XPOS_DEV"),
+		"CognitoUserPool": jsii.String("ap-south-1_gXgaeT7lu"),
+	}
+
+	getBusinessByIdLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetBusinessById"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetBusinessById"),
+		Description:  jsii.String("Get Business Detail By ID"),
+		Entry:        jsii.String("../go-lambda-func/get-business-by-id"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  &map[string]*string{},
+	})
+
+	createNewBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"CreateNewBusinessLambda"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "CreateNewBusinessLambda"),
+		Description:  jsii.String("Create New Business for the application"),
+		Entry:        jsii.String("../go-lambda-func/create-new-business"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  &map[string]*string{},
+	})
+
+	updateBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"UpdateBusinessLambda"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "UpdateBusinessLambda"),
+		Description:  jsii.String("Update Business Detail."),
+		Entry:        jsii.String("../go-lambda-func/update-business"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  &map[string]*string{},
 	})
 
 	businessPath := restApi.Root().AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
@@ -213,6 +249,155 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 
 	// Handler for updating business detail: PUT /business/{businessId}
 	businessId.AddMethod(jsii.String("PUT"), awscdkrest.NewLambdaIntegration(updateBusinessLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Create URL For deployment of Business Logo Upload
+	businessLogoUploadUrlLambda := awscdklambdanodejs.NewNodejsFunction(businessStack, jsii.String(ProjectPrefix+"BusinessLogoUploadUrl"), &awscdklambdanodejs.NodejsFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "BusinessLogoUploadUrl"),
+		Entry:        jsii.String("../nodejs-lambda-func/image-processing/business-upload-url/index.ts"),
+		Handler:      jsii.String("handler"),
+		Runtime:      awslambda.Runtime_NODEJS_16_X(),
+		MemorySize:   jsii.Number(128),
+		Role:         role,
+		Environment: &map[string]*string{
+			"URL_EXPIRATION_SECONDS": jsii.String("300"),
+			"IMAGE_IMAGE_BUCKET":     jsii.String("xpos-image-stage"),
+			"BUCKET_PREFIX":          jsii.String("parchi"),
+		},
+	})
+
+	logoApi := businessId.AddResource(jsii.String("logo"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	// Handler for: GET /business/{businessId}/logo
+	logoApi.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(businessLogoUploadUrlLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Lambda for compressing the image and store in the S3 bucket
+	compressImageLambda := awscdklambdanodejs.NewNodejsFunction(businessStack, jsii.String(ProjectPrefix+"CompressImageLambda"), &awscdklambdanodejs.NodejsFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "CompressImageLambda"),
+		Entry:        jsii.String("../nodejs-lambda-func/image-processing/compress-image/compressImageHandler.js"),
+		Handler:      jsii.String("main"),
+		Runtime:      awslambda.Runtime_NODEJS_16_X(),
+		MemorySize:   jsii.Number(256),
+		Role:         role,
+		Environment: &map[string]*string{
+			"INPUT_BUCKET":  jsii.String("xpos-image-stage"),
+			"OUTPUT_BUCKET": jsii.String("xpos-image"),
+		},
+		Bundling: &awscdklambdanodejs.BundlingOptions{
+			ExternalModules: &[]*string{
+				jsii.String("aws-sdk"),
+				jsii.String("sharp"),
+			},
+		},
+		Layers: &[]awslambda.ILayerVersion{
+			lambdaLayers,
+		},
+	})
+
+	inputImageBucket := awss3.Bucket_FromBucketName(businessStack, jsii.String("xpos-image-stage"), jsii.String("xpos-image-stage"))
+
+	// Create listener for the image upload notification
+	inputImageBucket.AddEventNotification(awss3.EventType_OBJECT_CREATED_PUT, awss3notifications.NewLambdaDestination(compressImageLambda), &awss3.NotificationKeyFilter{
+		Prefix: jsii.String("parchi/"),
+	})
+
+	// User Stack Creating new business and new user
+	getEmployeeFromBusiness := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetEmployeeFromBusiness"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetEmployeeFromBusiness"),
+		Description:  jsii.String("Get Employees from business."),
+		Entry:        jsii.String("../go-lambda-func/get-employee-from-business"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	businessEmpApi := businessId.AddResource(jsii.String("employee"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	// Handler for: GET /business/{businessId}/employee
+	businessEmpApi.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getEmployeeFromBusiness, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Create new employee for the store.
+	createCreateStoreEmployeeLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"CreateStoreEmployee"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "CreateStoreEmployee"),
+		Description:  jsii.String("Get Employees from business."),
+		Entry:        jsii.String("../go-lambda-func/create-new-employee"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	// Handler for: POST /business/{businessId}/employee
+	businessEmpApi.AddMethod(jsii.String("POST"), awscdkrest.NewLambdaIntegration(createCreateStoreEmployeeLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Get Employee from store by id
+	getEmployeeFromBusinessById := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetEmployeeFromBusinessById"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetEmployeeFromBusinessById"),
+		Description:  jsii.String("Get Employees from business."),
+		Entry:        jsii.String("../go-lambda-func/get-employee-from-business-by-id"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	businessUserApi := businessEmpApi.AddResource(jsii.String("{userid}"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	// Handler for: GET /business/{businessId}/employee/{userid}
+	businessUserApi.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getEmployeeFromBusinessById, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	userPath := restApi.Root().AddResource(jsii.String("user"), &awscdkrest.ResourceOptions{})
+
+	// Get Employee from store by id
+	updateEmployeeDetail := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"UpdateEmployee"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "UpdateEmployee"),
+		Description:  jsii.String("Employee can update their detail like email language name."),
+		Entry:        jsii.String("../go-lambda-func/update-employee"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	// Handler for: PUT /user/{userid}
+	userPath.AddMethod(jsii.String("PUT"), awscdkrest.NewLambdaIntegration(updateEmployeeDetail, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Get Business for the user assigned
+	getBusinessAssignedToUser := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetBusinessForUser"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetBusinessForUser"),
+		Description:  jsii.String("List all the business assigned to user."),
+		Entry:        jsii.String("../go-lambda-func/get-business-for-user"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	userBusiness := userPath.AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
+
+	// Handler for: GET /user/{userid}/business
+	userBusiness.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getBusinessAssignedToUser, &awscdkrest.LambdaIntegrationOptions{
 		Proxy: jsii.Bool(true),
 	}), &awscdkrest.MethodOptions{})
 
