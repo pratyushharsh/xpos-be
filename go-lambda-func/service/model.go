@@ -4,14 +4,9 @@ import "time"
 
 type EmployeeRole string
 
-const (
-	OWNER    EmployeeRole = "OWNER"
-	EMPLOYEE EmployeeRole = "EMPLOYEE"
-	CASHIER  EmployeeRole = "CASHIER"
-)
-
 type CreateBusinessRequest struct {
 	Name       *string `json:"name"`
+	LegalName  *string `json:"legal_name"`
 	Email      *string `json:"email"`
 	Address1   *string `json:"address1"`
 	Address2   *string `json:"address2"`
@@ -30,6 +25,7 @@ type CreateBusinessRequest struct {
 type CreateBusinessResponse struct {
 	BusinessId *int       `json:"business_id"`
 	Name       *string    `json:"name"`
+	LegalName  *string    `json:"legal_name"`
 	Email      *string    `json:"email"`
 	Address1   *string    `json:"address1"`
 	Address2   *string    `json:"address2"`
@@ -56,6 +52,7 @@ type Business struct {
 	Type            *string
 	BusinessId      *int                    `json:"business_id"`
 	Name            *string                 `json:"name"`
+	LegalName       *string                 `json:"legal_name"`
 	Email           *string                 `json:"email"`
 	Address1        *string                 `json:"address1"`
 	Address2        *string                 `json:"address2"`

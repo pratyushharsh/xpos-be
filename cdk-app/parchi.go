@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/aws/aws-cdk-go/awscdk/v2"
 	awscdkrest "github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awscognito"
@@ -23,6 +24,17 @@ const ProjectTag = ProjectName + "-" + ProjectEnvironment
 const ProjectPrefix = ProjectName + "-" + ProjectEnvironment + "-"
 const StackPrefix = ProjectName + "-"
 
+func mergeTwoMaps(a *map[string]*string, b *map[string]*string) *map[string]*string {
+	merged := make(map[string]*string)
+	for k, v := range *a {
+		merged[k] = v
+	}
+	for k, v := range *b {
+		merged[k] = v
+	}
+	return &merged
+}
+
 func main() {
 	defer jsii.Close()
 
@@ -36,7 +48,7 @@ func main() {
 
 	globalRole := jsii.String("thelawala-admin-dev")
 
-	NewUserStack(app, StackPrefix+"UserStack", &UserStackProps{
+	userStack := NewUserStack(app, StackPrefix+"UserStack", &UserStackProps{
 		StackProps: awscdk.StackProps{
 			Env: env(),
 			Tags: &map[string]*string{
@@ -45,6 +57,8 @@ func main() {
 		},
 		RoleName: globalRole,
 	})
+
+	fmt.Printf("%s", userStack)
 
 	NewBusinessStack(app, StackPrefix+"BusinessStack", &BusinessStackProps{
 		StackProps: awscdk.StackProps{
@@ -153,12 +167,28 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 				Mutable:  jsii.Bool(false),
 			},
 		},
+		PasswordPolicy: &awscognito.PasswordPolicy{
+			RequireDigits:    jsii.Bool(false),
+			RequireLowercase: jsii.Bool(false),
+			RequireSymbols:   jsii.Bool(false),
+			RequireUppercase: jsii.Bool(false),
+			MinLength:        jsii.Number(8),
+		},
 	})
 
 	userPool.AddTrigger(awscognito.UserPoolOperation_PRE_SIGN_UP(), preSignUpLambda)
 	userPool.AddTrigger(awscognito.UserPoolOperation_CREATE_AUTH_CHALLENGE(), createAuthChallangeLambda)
 	userPool.AddTrigger(awscognito.UserPoolOperation_DEFINE_AUTH_CHALLENGE(), defineAuthChallange)
 	userPool.AddTrigger(awscognito.UserPoolOperation_VERIFY_AUTH_CHALLENGE_RESPONSE(), verifyAuthChallenge)
+
+	userPool.AddClient(jsii.String(ProjectPrefix+"MobileApp"), &awscognito.UserPoolClientOptions{
+		GenerateSecret:     jsii.Bool(false),
+		UserPoolClientName: jsii.String(ProjectPrefix + "MobileApp"),
+	})
+
+	userStack.ExportValue(userPool.UserPoolId(), &awscdk.ExportValueOptions{
+		Name: jsii.String(ProjectPrefix + "UserPool"),
+	})
 
 	return userStack
 }
@@ -196,8 +226,9 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 	//  })
 
 	lambdaEnvironmentVariable := &map[string]*string{
-		"DBTable":         jsii.String("XPOS_DEV"),
-		"CognitoUserPool": jsii.String("ap-south-1_gXgaeT7lu"),
+		"DBTable": jsii.String("XPOS_DEV"),
+		//"CognitoUserPool": jsii.String("ap-south-1_gXgaeT7lu"),
+		"CognitoUserPool": awscdk.Fn_ImportValue(jsii.String(ProjectPrefix + "UserPool")),
 	}
 
 	getBusinessByIdLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetBusinessById"), &awscdklambdago.GoFunctionProps{
@@ -207,7 +238,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Role:         role,
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
+		Environment:  lambdaEnvironmentVariable,
 	})
 
 	createNewBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"CreateNewBusinessLambda"), &awscdklambdago.GoFunctionProps{
@@ -217,7 +248,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Role:         role,
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
+		Environment:  lambdaEnvironmentVariable,
 	})
 
 	updateBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"UpdateBusinessLambda"), &awscdklambdago.GoFunctionProps{
@@ -227,7 +258,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Role:         role,
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
-		Environment:  &map[string]*string{},
+		Environment:  lambdaEnvironmentVariable,
 	})
 
 	businessPath := restApi.Root().AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
@@ -260,11 +291,11 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_NODEJS_16_X(),
 		MemorySize:   jsii.Number(128),
 		Role:         role,
-		Environment: &map[string]*string{
+		Environment: mergeTwoMaps(lambdaEnvironmentVariable, &map[string]*string{
 			"URL_EXPIRATION_SECONDS": jsii.String("300"),
 			"IMAGE_IMAGE_BUCKET":     jsii.String("xpos-image-stage"),
 			"BUCKET_PREFIX":          jsii.String("parchi"),
-		},
+		}),
 	})
 
 	logoApi := businessId.AddResource(jsii.String("logo"), &awscdkrest.ResourceOptions{
@@ -285,10 +316,10 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_NODEJS_16_X(),
 		MemorySize:   jsii.Number(256),
 		Role:         role,
-		Environment: &map[string]*string{
+		Environment: mergeTwoMaps(lambdaEnvironmentVariable, &map[string]*string{
 			"INPUT_BUCKET":  jsii.String("xpos-image-stage"),
 			"OUTPUT_BUCKET": jsii.String("xpos-image"),
-		},
+		}),
 		Bundling: &awscdklambdanodejs.BundlingOptions{
 			ExternalModules: &[]*string{
 				jsii.String("aws-sdk"),
@@ -378,8 +409,10 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Environment:  lambdaEnvironmentVariable,
 	})
 
+	userIdPath := userPath.AddResource(jsii.String("{userid}"), &awscdkrest.ResourceOptions{})
+
 	// Handler for: PUT /user/{userid}
-	userPath.AddMethod(jsii.String("PUT"), awscdkrest.NewLambdaIntegration(updateEmployeeDetail, &awscdkrest.LambdaIntegrationOptions{
+	userIdPath.AddMethod(jsii.String("PUT"), awscdkrest.NewLambdaIntegration(updateEmployeeDetail, &awscdkrest.LambdaIntegrationOptions{
 		Proxy: jsii.Bool(true),
 	}), &awscdkrest.MethodOptions{})
 
@@ -394,7 +427,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Environment:  lambdaEnvironmentVariable,
 	})
 
-	userBusiness := userPath.AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
+	userBusiness := userIdPath.AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
 
 	// Handler for: GET /user/{userid}/business
 	userBusiness.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getBusinessAssignedToUser, &awscdkrest.LambdaIntegrationOptions{

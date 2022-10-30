@@ -7,7 +7,12 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"log"
+	"os"
 	svc "service"
+)
+
+var (
+	CommonTable = os.Getenv("DBTable")
 )
 
 func UpdateBusiness(businessId string, req *svc.CreateBusinessRequest) *svc.StoreError {
@@ -23,6 +28,12 @@ func UpdateBusiness(businessId string, req *svc.CreateBusinessRequest) *svc.Stor
 		updateExp += "#name = :name, "
 		expressionAttributeNames["#name"] = aws.String("name")
 		expressionAttributeValues[":name"] = &dynamodb.AttributeValue{S: aws.String(*req.Name)}
+	}
+
+	if req.LegalName != nil {
+		updateExp += "#legalName = :legalName, "
+		expressionAttributeNames["#legalName"] = aws.String("legal_name")
+		expressionAttributeValues[":legalName"] = &dynamodb.AttributeValue{S: aws.String(*req.LegalName)}
 	}
 
 	if req.Email != nil {
@@ -57,7 +68,7 @@ func UpdateBusiness(businessId string, req *svc.CreateBusinessRequest) *svc.Stor
 
 	if req.PostalCode != nil {
 		updateExp += "#postalCode = :postalCode, "
-		expressionAttributeNames["#postalCode"] = aws.String("postalCode")
+		expressionAttributeNames["#postalCode"] = aws.String("postal_code")
 		expressionAttributeValues[":postalCode"] = &dynamodb.AttributeValue{S: aws.String(*req.PostalCode)}
 	}
 
@@ -77,6 +88,12 @@ func UpdateBusiness(businessId string, req *svc.CreateBusinessRequest) *svc.Stor
 		updateExp += "#locale = :locale, "
 		expressionAttributeNames["#locale"] = aws.String("locale")
 		expressionAttributeValues[":locale"] = &dynamodb.AttributeValue{S: aws.String(*req.Locale)}
+	}
+
+	if req.Locale != nil {
+		updateExp += "#currency = :currency, "
+		expressionAttributeNames["#currency"] = aws.String("currency")
+		expressionAttributeValues[":currency"] = &dynamodb.AttributeValue{S: aws.String(*req.Currency)}
 	}
 
 	if req.Gst != nil {
@@ -104,7 +121,7 @@ func UpdateBusiness(businessId string, req *svc.CreateBusinessRequest) *svc.Stor
 	updateExp = updateExp[:len(updateExp)-2]
 
 	tmp := dynamodb.UpdateItemInput{
-		TableName: aws.String("XPOS_DEV"),
+		TableName: aws.String(CommonTable),
 		Key: map[string]*dynamodb.AttributeValue{
 			"PK": {
 				S: aws.String(pk),

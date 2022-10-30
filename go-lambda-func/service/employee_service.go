@@ -7,13 +7,18 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"log"
+	"os"
+)
+
+var (
+	CommonTable     = os.Getenv("DBTable")
+	CognitoUserPool = os.Getenv("CognitoUserPool")
 )
 
 type EmployeeRepository struct{}
 
 func GetUserFromCognito(username string) (*cognitoidentityprovider.AdminGetUserOutput, error) {
 	cc := GetCognitoClient()
-
 	user, err := cc.AdminGetUser(&cognitoidentityprovider.AdminGetUserInput{
 		UserPoolId: aws.String(CognitoUserPool),
 		Username:   aws.String(username),
@@ -51,7 +56,7 @@ func (e *EmployeeRepository) GetEmployeeId(username *string) (*Employee, error) 
 
 	emp := &Employee{
 		Type:          nil,
-		EmployeeId:    user.Username,
+		EmployeeId:    FindUserAttributeFromCognito(user.UserAttributes, "phone_number"),
 		FirstName:     FindUserAttributeFromCognito(user.UserAttributes, "given_name"),
 		MiddleName:    FindUserAttributeFromCognito(user.UserAttributes, "middle_name"),
 		LastName:      FindUserAttributeFromCognito(user.UserAttributes, "family_name"),

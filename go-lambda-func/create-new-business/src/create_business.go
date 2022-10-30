@@ -8,13 +8,15 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"log"
+	"os"
 	svc "service"
 	"strconv"
 	"time"
 )
 
 var (
-	empRepo svc.IEmployee = &svc.EmployeeRepository{}
+	empRepo     svc.IEmployee = &svc.EmployeeRepository{}
+	CommonTable               = os.Getenv("DBTable")
 )
 
 func GetNewBusinessID() (*int, error) {
@@ -57,6 +59,7 @@ func createNewBusinessInputRequest(businessId *int, businessDetail *svc.CreateBu
 	return &svc.CreateBusinessResponse{
 		BusinessId: businessId,
 		Name:       businessDetail.Name,
+		LegalName:  businessDetail.LegalName,
 		Email:      businessDetail.Email,
 		Address1:   businessDetail.Address1,
 		Address2:   businessDetail.Address2,
@@ -89,6 +92,7 @@ func CreateBusinessInDb(req *svc.CreateBusinessResponse) *svc.CreateBusinessResp
 			Type:       aws.String("STORE"),
 			BusinessId: req.BusinessId,
 			Name:       req.Name,
+			LegalName:  req.LegalName,
 			Email:      req.Email,
 			Address1:   req.Address1,
 			Address2:   req.Address2,
@@ -102,8 +106,8 @@ func CreateBusinessInDb(req *svc.CreateBusinessResponse) *svc.CreateBusinessResp
 			CreatedBy:  req.CreatedBy,
 			CreatedAt:  req.CreatedAt,
 			CustomAttribute: &map[string]interface{}{
-				"GST": businessId,
-				"PAN": businessId,
+				"GST": req.Gst,
+				"PAN": req.Pan,
 			},
 		},
 	}
@@ -128,7 +132,7 @@ func CreateBusinessInDb(req *svc.CreateBusinessResponse) *svc.CreateBusinessResp
 	_, err := db.PutItem(&dynamodb.PutItemInput{
 		Item:                   val.M,
 		ReturnConsumedCapacity: aws.String("TOTAL"),
-		TableName:              aws.String("XPOS_DEV"),
+		TableName:              aws.String(CommonTable),
 	})
 	if err != nil {
 		log.Println(err)

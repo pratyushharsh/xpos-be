@@ -75,9 +75,9 @@ func urlMappings() {
 	router.POST("/business", WrapLambdaFunction(f1.CreateBusinessHandler))
 	router.GET("/business/:businessId", WrapLambdaFunction(f2.GetBusinessByIdHandler))
 	router.PUT("/business/:businessId", WrapLambdaFunction(f3.UpdateBusinessHandler))
-	router.GET("/business/:businessId/user", WrapLambdaFunction(f4.GetEmployeeFromBusinessHandler))
-	router.POST("/business/:businessId/user", WrapLambdaFunction(f5.CreateNewBusinessEmployee))
-	router.GET("/business/:businessId/user/:userid", WrapLambdaFunction(f6.GetEmployeeFromBusinessById))
+	router.GET("/business/:businessId/employee", WrapLambdaFunction(f4.GetEmployeeFromBusinessHandler))
+	router.POST("/business/:businessId/employee", WrapLambdaFunction(f5.CreateNewBusinessEmployee))
+	router.GET("/business/:businessId/employee/:userid", WrapLambdaFunction(f6.GetEmployeeFromBusinessById))
 	router.GET("/user/:userid/business", WrapLambdaFunction(f7.GetBusinessForUserHandler))
 	router.PUT("/user/:userid", WrapLambdaFunction(f8.UpdateEmployeeHandler))
 }

@@ -8,7 +8,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"log"
+	"os"
 	svc "service"
+)
+
+var (
+	CommonTable = os.Getenv("DBTable")
 )
 
 func GetBusinessByIdHandler(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -26,7 +31,7 @@ func GetBusinessByIdHandler(ctx context.Context, event events.APIGatewayProxyReq
 				S: aws.String("STORE#" + bId),
 			},
 		},
-		TableName: aws.String("XPOS_DEV"),
+		TableName: aws.String(CommonTable),
 	}
 
 	res, err := db.GetItem(inpReq)
