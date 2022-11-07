@@ -12,6 +12,7 @@ import (
 
 var (
 	CommonTable     = os.Getenv("DBTable")
+	DataTable       = os.Getenv("DataTable")
 	CognitoUserPool = os.Getenv("CognitoUserPool")
 )
 

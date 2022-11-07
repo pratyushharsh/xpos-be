@@ -174,6 +174,10 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 			RequireUppercase: jsii.Bool(false),
 			MinLength:        jsii.Number(8),
 		},
+		DeviceTracking: &awscognito.DeviceTracking{
+			DeviceOnlyRememberedOnUserPrompt: jsii.Bool(false),
+			ChallengeRequiredOnNewDevice:     jsii.Bool(false),
+		},
 	})
 
 	userPool.AddTrigger(awscognito.UserPoolOperation_PRE_SIGN_UP(), preSignUpLambda)
@@ -297,6 +301,47 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 			"BUCKET_PREFIX":          jsii.String("parchi"),
 		}),
 	})
+
+	// Settings For a store
+	settings := businessId.AddResource(jsii.String("settings"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	tax := settings.AddResource(jsii.String("tax"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	// Handler for: GET /business/{businessId}/settings/tax
+	getTaxForGroupForStoreLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetTaxGroupForStore"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetTaxGroupForStore"),
+		Description:  jsii.String("Get Tax Group For Store"),
+		Entry:        jsii.String("../go-lambda-func/get-tax-group-for-store"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	// Handler for: POST /business/{businessId}/settings/tax
+	createTaxForGroupForStoreLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"CreateTaxGroupForStore"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "CreateTaxGroupForStore"),
+		Description:  jsii.String("Create Tax Group For Store"),
+		Entry:        jsii.String("../go-lambda-func/create-tax-group"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	tax.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getTaxForGroupForStoreLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	tax.AddMethod(jsii.String("POST"), awscdkrest.NewLambdaIntegration(createTaxForGroupForStoreLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
 
 	logoApi := businessId.AddResource(jsii.String("logo"), &awscdkrest.ResourceOptions{
 		DefaultIntegration:   nil,

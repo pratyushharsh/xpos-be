@@ -3,6 +3,7 @@ go 1.19
 use (
 	./cdk-app
 	./local
+	./go-lambda-func/model
 	./go-lambda-func/service
 	./go-lambda-func/create-new-business
 	./go-lambda-func/get-business-by-id
@@ -12,4 +13,8 @@ use (
 	./go-lambda-func/get-employee-from-business-by-id
 	./go-lambda-func/get-business-for-user
 	./go-lambda-func/update-employee
+	./go-lambda-func/create-tax-group
+	./go-lambda-func/get-tax-group-for-store
+	./go-lambda-func/update-sync-data
+	./go-lambda-func/get-sync-data
 )
