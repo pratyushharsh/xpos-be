@@ -49,6 +49,11 @@ func WrapLambdaFunction(inp LambdaApiRequest) gin.HandlerFunc {
 			headers[key] = value[0]
 		}
 
+		var queryStrings = make(map[string]string)
+		for key, value := range c.Request.URL.Query() {
+			queryStrings[key] = value[0]
+		}
+
 		body, err := io.ReadAll(c.Request.Body)
 
 		req := events.APIGatewayProxyRequest{
@@ -57,7 +62,7 @@ func WrapLambdaFunction(inp LambdaApiRequest) gin.HandlerFunc {
 			HTTPMethod:                      c.Request.Method,
 			Headers:                         headers,
 			MultiValueHeaders:               nil,
-			QueryStringParameters:           nil,
+			QueryStringParameters:           queryStrings,
 			MultiValueQueryStringParameters: nil,
 			PathParameters:                  pathParams,
 			StageVariables:                  nil,

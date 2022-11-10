@@ -8,7 +8,7 @@ type TransactionHeaderEntityDao struct {
 	SK   *string `json:"SK"`
 	GPK1 *string `json:"GPK1"`
 	GSK1 *int64  `json:"GSK1"`
-
+	Type *string `json:"Type"`
 	*TransactionHeaderEntity
 }
 
@@ -25,10 +25,11 @@ type TransactionHeaderEntity struct {
 	EndDateTime      *int64                    `json:"endDateTime"`
 	IsVoid           *bool                     `json:"isVoid"`
 	LastChangedAt    *int64                    `json:"lastChangedAt"`
+	LastSyncedAt     *int64                    `json:"lastSyncedAt"`
 	LineItems        *[]TransactionLineItem    `json:"lineItems"`
 	Notes            *string                   `json:"notes"`
 	PaymentLineItems *[]TransactionPaymentLine `json:"paymentLineItems"`
-	RoundTotal       *int                      `json:"roundTotal"`
+	RoundTotal       *float32                  `json:"roundTotal"`
 	ShippingAddress  *string                   `json:"shippingAddress"`
 	Status           *string                   `json:"status"`
 	StoreCurrency    *string                   `json:"storeCurrency"`
@@ -49,7 +50,6 @@ type TransactionLineItem struct {
 	DiscountAmount       *float64                           `json:"discountAmount"`
 	ExtendedAmount       *float64                           `json:"extendedAmount"`
 	GrossAmount          *float64                           `json:"grossAmount"`
-	HashCode             *int64                             `json:"hashCode"`
 	Hsn                  *string                            `json:"hsn"`
 	IsVoid               *bool                              `json:"isVoid"`
 	ItemDescription      *string                            `json:"itemDescription"`
@@ -69,12 +69,12 @@ type TransactionLineItem struct {
 	PriceOverride        *bool                              `json:"priceOverride"`
 	PriceOverrideAmount  *float64                           `json:"priceOverrideAmount"`
 	PriceOverrideReason  *string                            `json:"priceOverrideReason"`
-	Quantity             *int                               `json:"quantity"`
-	ReturnComment        *interface{}                       `json:"returnComment"`
+	Quantity             *float32                           `json:"quantity"`
+	ReturnComment        *string                            `json:"returnComment"`
 	ReturnFlag           *bool                              `json:"returnFlag"`
 	ReturnReasonCode     *string                            `json:"returnReasonCode"`
 	ReturnTypeCode       *string                            `json:"returnTypeCode"`
-	ReturnedQuantity     *int                               `json:"returnedQuantity"`
+	ReturnedQuantity     *float32                           `json:"returnedQuantity"`
 	SerialNumber         *string                            `json:"serialNumber"`
 	ShippingWeight       *float64                           `json:"shippingWeight"`
 	StoreId              *int                               `json:"storeId"`
@@ -115,7 +115,7 @@ type TransactionLineItemTaxModifiers struct {
 	LineItemSeq           *int     `json:"lineItemSeq"`
 	OriginalTaxableAmount *float64 `json:"originalTaxableAmount"`
 	RawTaxAmount          *float64 `json:"rawTaxAmount"`
-	RawTaxPercentage      *int     `json:"rawTaxPercentage"`
+	RawTaxPercentage      *float32 `json:"rawTaxPercentage"`
 	TaxAmount             *float64 `json:"taxAmount"`
 	TaxGroupId            *string  `json:"taxGroupId"`
 	TaxLocationId         *string  `json:"taxLocationId"`

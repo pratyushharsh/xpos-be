@@ -230,7 +230,8 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 	//  })
 
 	lambdaEnvironmentVariable := &map[string]*string{
-		"DBTable": jsii.String("XPOS_DEV"),
+		"DBTable":   jsii.String("XPOS_DEV"),
+		"DataTable": jsii.String("XPOS_DATA"),
 		//"CognitoUserPool": jsii.String("ap-south-1_gXgaeT7lu"),
 		"CognitoUserPool": awscdk.Fn_ImportValue(jsii.String(ProjectPrefix + "UserPool")),
 	}
@@ -301,6 +302,42 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 			"BUCKET_PREFIX":          jsii.String("parchi"),
 		}),
 	})
+
+	// Create Sync Service
+	syncService := businessId.AddResource(jsii.String("sync"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	// Handler for: POST /business/{businessId}/sync
+	updateSyncLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"UpdateSyncService"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "UpdateSyncService"),
+		Description:  jsii.String("Sync Data from local to cloud."),
+		Entry:        jsii.String("../go-lambda-func/update-sync-data"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	syncService.AddMethod(jsii.String("POST"), awscdkrest.NewLambdaIntegration(updateSyncLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Handler for: GET /business/{businessId}/sync
+	getSyncLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetSyncService"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "GetSyncService"),
+		Description:  jsii.String("Get Sync Data from cloud."),
+		Entry:        jsii.String("../go-lambda-func/get-sync-data"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+	})
+
+	syncService.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getSyncLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
 
 	// Settings For a store
 	settings := businessId.AddResource(jsii.String("settings"), &awscdkrest.ResourceOptions{

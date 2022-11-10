@@ -32,7 +32,7 @@ func UpdateSyncHandler(ctx context.Context, event events.APIGatewayProxyRequest)
 		}, nil
 	}
 
-	dbErr := syncRepo.UpdateSyncData(bId, &req)
+	resp, dbErr := syncRepo.UpdateSyncData(bId, &req)
 	if dbErr != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode:      500,
@@ -42,7 +42,10 @@ func UpdateSyncHandler(ctx context.Context, event events.APIGatewayProxyRequest)
 		}, nil
 	}
 
+	res, _ := json.Marshal(resp)
+
 	return events.APIGatewayProxyResponse{
 		StatusCode: 200,
+		Body:       string(res),
 	}, nil
 }

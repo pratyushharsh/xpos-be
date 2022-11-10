@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"github.com/aws/aws-lambda-go/events"
 	svc "service"
+	"strconv"
+	"time"
 )
 
 var (
@@ -15,7 +17,14 @@ func GetSyncDataHandler(ctx context.Context, event events.APIGatewayProxyRequest
 	pathParams := event.PathParameters
 	bId := pathParams["businessId"]
 
-	syncData, err := syncRepo.GetSyncData(bId, nil)
+	from := event.QueryStringParameters["startTime"]
+
+	i, _ := strconv.ParseInt(from, 10, 64)
+
+	now := time.Now()
+	to := now.UnixMicro()
+
+	syncData, err := syncRepo.GetSyncData(bId, &i, &to)
 	if err != nil {
 		return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: 400}, err
 	}
