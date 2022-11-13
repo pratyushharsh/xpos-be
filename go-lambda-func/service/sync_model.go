@@ -6,6 +6,12 @@ type UpdateSyncRequest struct {
 	Transactions *[]*model.TransactionHeaderEntity `json:"transactions"`
 	Customers    *[]*model.CustomerEntity          `json:"customers"`
 	Products     *[]*model.ProductEntity           `json:"products"`
+	Config       *SyncConfig                       `json:"config"`
+}
+
+type SyncConfig struct {
+	TaxConfig     *[]*model.TaxGroupEntity     `json:"taxConfig"`
+	InvoiceConfig *[]*model.ReportConfigEntity `json:"invoiceConfig"`
 }
 
 type UpdateSyncResponse struct {
@@ -14,19 +20,19 @@ type UpdateSyncResponse struct {
 }
 
 type GetSyncResponse struct {
-	Transactions struct {
-		Data *[]*model.TransactionHeaderEntity `json:"data"`
-		From *int64                            `json:"from"`
-		To   *int64                            `json:"to"`
-	} `json:"transactions"`
-	Customers struct {
-		Data *[]*model.CustomerEntity `json:"data"`
-		From *int64                   `json:"from"`
-		To   *int64                   `json:"to"`
-	} `json:"customers"`
-	Products struct {
-		Data *[]*model.ProductEntity `json:"data"`
-		From *int64                  `json:"from"`
-		To   *int64                  `json:"to"`
-	} `json:"products"`
+	Transactions SyncData     `json:"transactions"`
+	Customers    SyncData     `json:"customers"`
+	Products     SyncData     `json:"products"`
+	Config       ConfigOutput `json:"config"`
+}
+
+type ConfigOutput struct {
+	TaxConfig     SyncData `json:"taxConfig"`
+	InvoiceConfig SyncData `json:"invoiceConfig"`
+}
+
+type SyncData struct {
+	Data interface{} `json:"data"`
+	From *int64      `json:"from"`
+	To   *int64      `json:"to"`
 }

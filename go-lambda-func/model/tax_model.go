@@ -1,16 +1,18 @@
 package model
 
 type TaxGroupDao struct {
-	PK *string `json:"PK"`
-	SK *string `json:"SK"`
-	*TaxGroup
+	PK        *string                     `json:"PK"`
+	SK        *string                     `json:"SK"`
+	GPK1      *string                     `json:"GPK1"`
+	GSK1      *int64                      `json:"GSK1"`
+	Type      *string                     `json:"Type"`
+	TaxGroups *map[string]*TaxGroupEntity `json:"taxGroups"`
 }
 
 // PK - STORE#<store_id>
 // SK - TAX_GROUP#<tax_group_id>
 
-type TaxGroup struct {
-	StoreId     *string    `json:"storeId"`
+type TaxGroupEntity struct {
 	Description *string    `json:"description"`
 	GroupId     *string    `json:"groupId"`
 	Name        *string    `json:"name"`
