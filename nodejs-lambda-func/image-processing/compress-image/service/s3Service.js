@@ -19,7 +19,7 @@ class S3Service {
     saveImage(bucketName, key, data) {
         return this.s3.putObject({
             Bucket: bucketName,
-            Key: key.startsWith('/') ? key.substring(1) : key,
+            Key: key,
             Body: data
         })
             .promise()

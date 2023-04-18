@@ -14,6 +14,28 @@ import (
 
 type TaxRepository struct{}
 
+func (ts TaxRepository) getTaxGroupsForStore(storeId string) *model.TaxGroupDao {
+	db := GetDynamoDbClient()
+
+	item, _ := db.GetItem(&dynamodb.GetItemInput{
+		Key: map[string]*dynamodb.AttributeValue{
+			"PK": {
+				S: aws.String("STORE#" + storeId),
+			},
+			"SK": {
+				S: aws.String("CFG#TAX"),
+			},
+		},
+
+		TableName: aws.String(DataTable),
+	})
+
+	var tp *model.TaxGroupDao
+	_ = dynamodbattribute.UnmarshalMap(item.Item, &tp)
+
+	return tp
+}
+
 func (ts *TaxRepository) GetAllTaxGroupForStore(storeId string) (*[]model.TaxGroupEntity, error) {
 	db := GetDynamoDbClient()
 

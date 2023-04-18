@@ -34,7 +34,7 @@ func CreateNewTaxGroupHandler(ctx context.Context, event events.APIGatewayProxyR
 	// Check if business exist and get business name
 
 	var req *[]model.TaxGroupEntity
-	err := json.Unmarshal([]byte(event.Body), &req)
+		err := json.Unmarshal([]byte(event.Body), &req)
 
 	// Check if store exists
 

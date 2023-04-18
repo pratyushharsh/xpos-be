@@ -12,11 +12,22 @@ type TransactionHeaderEntityDao struct {
 	*TransactionHeaderEntity
 }
 
+type Address struct {
+	Address1    string `json:"address1"`
+	Address2    string `json:"address2"`
+	City        string `json:"city"`
+	Country     string `json:"country"`
+	CountryCode string `json:"countryCode"`
+	State       string `json:"state"`
+	StateCode   string `json:"stateCode"`
+	Zipcode     string `json:"zipcode"`
+}
+
 type TransactionHeaderEntity struct {
 	AssociateId      *string                   `json:"associateId"`
 	AssociateName    *string                   `json:"associateName"`
 	BeginDatetime    *int64                    `json:"beginDatetime"`
-	BillingAddress   *string                   `json:"billingAddress"`
+	BillingAddress   *Address                  `json:"billingAddress"`
 	BusinessDate     *int64                    `json:"businessDate"`
 	CustomerId       *string                   `json:"customerId"`
 	CustomerName     *string                   `json:"customerName"`
@@ -30,7 +41,7 @@ type TransactionHeaderEntity struct {
 	Notes            *string                   `json:"notes"`
 	PaymentLineItems *[]TransactionPaymentLine `json:"paymentLineItems"`
 	RoundTotal       *float32                  `json:"roundTotal"`
-	ShippingAddress  *string                   `json:"shippingAddress"`
+	ShippingAddress  *Address                  `json:"shippingAddress"`
 	Status           *string                   `json:"status"`
 	StoreCurrency    *string                   `json:"storeCurrency"`
 	StoreId          *int                      `json:"storeId"`
@@ -38,7 +49,8 @@ type TransactionHeaderEntity struct {
 	Subtotal         *float64                  `json:"subtotal"`
 	TaxTotal         *float64                  `json:"taxTotal"`
 	Total            *float64                  `json:"total"`
-	TransId          *int                      `json:"transId"`
+	TransId          *string                   `json:"transId"`
+	InvoiceId        *string                   `json:"invoiceId"`
 	TransactionType  *string                   `json:"transactionType"`
 }
 
@@ -53,6 +65,8 @@ type TransactionLineItem struct {
 	Hsn                  *string                            `json:"hsn"`
 	IsVoid               *bool                              `json:"isVoid"`
 	ItemDescription      *string                            `json:"itemDescription"`
+	ItemColor            *string                            `json:"itemColor"`
+	ItemSize             *string                            `json:"itemSize"`
 	ItemId               *string                            `json:"itemId"`
 	ItemIdEntryMethod    *string                            `json:"itemIdEntryMethod"`
 	LineItemSeq          *int                               `json:"lineItemSeq"`
@@ -63,7 +77,7 @@ type TransactionLineItem struct {
 	OriginalBusinessDate *int64                             `json:"originalBusinessDate"`
 	OriginalLineItemSeq  *int64                             `json:"originalLineItemSeq"`
 	OriginalPosId        *int                               `json:"originalPosId"`
-	OriginalTransSeq     *int                               `json:"originalTransSeq"`
+	OriginalTransSeq     *string                            `json:"originalTransSeq"`
 	PosId                *int                               `json:"posId"`
 	PriceEntryMethod     *string                            `json:"priceEntryMethod"`
 	PriceOverride        *bool                              `json:"priceOverride"`
@@ -80,7 +94,7 @@ type TransactionLineItem struct {
 	StoreId              *int                               `json:"storeId"`
 	TaxAmount            *float64                           `json:"taxAmount"`
 	TaxModifiers         *[]TransactionLineItemTaxModifiers `json:"taxModifiers"`
-	TransSeq             *int                               `json:"transSeq"`
+	TransSeq             *string                            `json:"transSeq"`
 	UnitCost             *float64                           `json:"unitCost"`
 	UnitPrice            *float64                           `json:"unitPrice"`
 	Uom                  *string                            `json:"uom"`
@@ -100,12 +114,12 @@ type TransactionLineItemModifier struct {
 	LineItemModSeq          *int     `json:"lineItemModSeq"`
 	LineItemSeq             *int     `json:"lineItemSeq"`
 	Notes                   *string  `json:"notes"`
-	Percent                 *int     `json:"percent"`
+	Percent                 *float32 `json:"percent"`
 	PosId                   *int     `json:"posId"`
 	PriceModifierReasonCode *string  `json:"priceModifierReasonCode"`
 	PromotionId             *string  `json:"promotionId"`
 	StoreId                 *int     `json:"storeId"`
-	TransSeq                *int     `json:"transSeq"`
+	TransSeq                *string  `json:"transSeq"`
 }
 
 type TransactionLineItemTaxModifiers struct {
@@ -127,7 +141,7 @@ type TransactionLineItemTaxModifiers struct {
 	TaxRuleId             *string  `json:"taxRuleId"`
 	TaxRuleName           *string  `json:"taxRuleName"`
 	TaxableAmount         *float64 `json:"taxableAmount"`
-	TransSeq              *int     `json:"transSeq"`
+	TransSeq              *string  `json:"transSeq"`
 }
 
 type TransactionPaymentLine struct {
@@ -141,5 +155,5 @@ type TransactionPaymentLine struct {
 	TenderId         *string  `json:"tenderId"`
 	TenderStatusCode *string  `json:"tenderStatusCode"`
 	Token            *string  `json:"token"`
-	TransId          *int     `json:"transId"`
+	TransId          *string  `json:"transId"`
 }

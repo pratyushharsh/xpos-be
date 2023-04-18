@@ -17,4 +17,6 @@ use (
 	./go-lambda-func/get-tax-group-for-store
 	./go-lambda-func/update-sync-data
 	./go-lambda-func/get-sync-data
+	./go-lambda-func/s3-extract-zip
+	./go-lambda-func/imagekit-token
 )

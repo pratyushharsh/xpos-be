@@ -10,13 +10,17 @@ type UpdateSyncRequest struct {
 }
 
 type SyncConfig struct {
-	TaxConfig     *[]*model.TaxGroupEntity     `json:"taxConfig"`
-	InvoiceConfig *[]*model.ReportConfigEntity `json:"invoiceConfig"`
+	TaxConfig      *[]*model.TaxGroupEntity     `json:"taxConfig"`
+	InvoiceConfig  *[]*model.ReportConfigEntity `json:"invoiceConfig"`
+	SequenceConfig *[]*model.SequenceEntity     `json:"sequenceConfig"`
 }
 
 type UpdateSyncResponse struct {
-	ErrorKey     *[]*string `json:"errorKey"`
-	LastSyncedAt *int64     `json:"lastSyncedAt"`
+	Transactions *SyncResponse `json:"transactions"`
+	Customers    *SyncResponse `json:"customers"`
+	Products     *SyncResponse `json:"products"`
+	ErrorKey     *[]*string   `json:"errorKey"`
+	LastSyncedAt *int64       `json:"lastSyncedAt"`
 }
 
 type GetSyncResponse struct {
@@ -27,8 +31,15 @@ type GetSyncResponse struct {
 }
 
 type ConfigOutput struct {
-	TaxConfig     SyncData `json:"taxConfig"`
-	InvoiceConfig SyncData `json:"invoiceConfig"`
+	TaxConfig      SyncData `json:"taxConfig"`
+	InvoiceConfig  SyncData `json:"invoiceConfig"`
+	SequenceConfig SyncData `json:"sequenceConfig"`
+}
+
+type SyncResponse struct {
+	Data         interface{} `json:"data"`
+	Error        interface{} `json:"error"`
+	LastSyncedAt *int64      `json:"lastSyncedAt"`
 }
 
 type SyncData struct {

@@ -6,7 +6,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"log"
 	"model"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -18,43 +20,12 @@ var (
 	customerType    = "CUS"
 	configType      = "CFG"
 
-	taxConfigType     = "TAX"
-	invoiceConfigType = "INV"
+	taxConfigType      = "TAX"
+	invoiceConfigType  = "INV"
+	sequenceConfigType = "SEQ"
+
+	taxService = TaxRepository{}
 )
-
-func buildWriteRequestForTransaction(storeId *string, utcTimeStamp *int64, transactions *[]*model.TransactionHeaderEntity, writeRequest []*dynamodb.WriteRequest) ([]*dynamodb.WriteRequest, *ServiceError) {
-	for _, transaction := range *transactions {
-
-		pk := "STORE#" + *storeId
-		sk := "TRAN#" + strconv.Itoa(*transaction.TransId)
-
-		transaction.LastSyncedAt = utcTimeStamp
-		// Convert the item to DynamoDB AttributeValues
-		dao := model.TransactionHeaderEntityDao{
-			PK:                      &pk,
-			SK:                      &sk,
-			GPK1:                    storeId,
-			GSK1:                    utcTimeStamp,
-			Type:                    &transactionType,
-			TransactionHeaderEntity: transaction,
-		}
-
-		av, err := dynamodbattribute.MarshalMap(dao)
-		if err != nil {
-			return nil, &ServiceError{
-				ErrorCode:    "500",
-				ErrorMessage: "Error Unparsing input request",
-			}
-		}
-		writeRequest = append(writeRequest, &dynamodb.WriteRequest{
-			PutRequest: &dynamodb.PutRequest{
-				Item: av,
-			},
-		})
-	}
-
-	return writeRequest, nil
-}
 
 func buildWriteRequestForProducts(storeId *string, utcTimeStamp *int64, products *[]*model.ProductEntity, writeRequest []*dynamodb.WriteRequest) ([]*dynamodb.WriteRequest, *ServiceError) {
 	for _, product := range *products {
@@ -120,14 +91,56 @@ func buildWriteRequestForCustomers(storeId *string, utcTimeStamp *int64, custome
 	return writeRequest, nil
 }
 
-func buildWriteRequestForTaxConfig(storeId *string, utcTimeStamp *int64, taxConfigGroup *[]*model.TaxGroupEntity, writeRequest []*dynamodb.WriteRequest) ([]*dynamodb.WriteRequest, *ServiceError) {
+func buildWriteRequestForTaxConfig(storeId *string, utcTimeStamp *int64, clientTg *[]*model.TaxGroupEntity, writeRequest []*dynamodb.WriteRequest) ([]*dynamodb.WriteRequest, *ServiceError) {
 	pk := "STORE#" + *storeId
 	sk := configType + "#" + taxConfigType
 	// Convert the item to DynamoDB AttributeValues
 
 	taxGroup := make(map[string]*model.TaxGroupEntity)
 
-	for _, taxConfig := range *taxConfigGroup {
+	var serverTaxGroup []*model.TaxGroupEntity
+	existingTaxGroup := taxService.getTaxGroupsForStore(*storeId)
+
+	if existingTaxGroup != nil && existingTaxGroup.TaxGroups != nil {
+		for _, taxGroup := range *existingTaxGroup.TaxGroups {
+			serverTaxGroup = append(serverTaxGroup, taxGroup)
+		}
+	}
+
+	sort.Sort(model.TaxGroupEntitySorter(*clientTg))
+	sort.Sort(model.TaxGroupEntitySorter(serverTaxGroup))
+
+	clientTaxGroup := *clientTg
+	// Merge the tax rules
+	var merged []*model.TaxGroupEntity
+	var i, j int
+	for i < len(serverTaxGroup) && j < len(clientTaxGroup) {
+		if strings.Compare(*serverTaxGroup[i].GroupId, *clientTaxGroup[j].GroupId) < 0 {
+			merged = append(merged, serverTaxGroup[i])
+			i++
+		} else if strings.Compare(*serverTaxGroup[i].GroupId, *clientTaxGroup[j].GroupId) > 0 {
+			merged = append(merged, clientTaxGroup[j])
+			j++
+		} else {
+			mergedRule := serverTaxGroup[i].Merge(*clientTaxGroup[j])
+			merged = append(merged, &mergedRule)
+			i++
+			j++
+		}
+	}
+
+	for i < len(serverTaxGroup) {
+		merged = append(merged, serverTaxGroup[i])
+		i++
+	}
+
+	for j < len(clientTaxGroup) {
+		merged = append(merged, clientTaxGroup[j])
+		j++
+	}
+
+	// Merge the two taxgroups
+	for _, taxConfig := range merged {
 		taxGroup[*taxConfig.GroupId] = taxConfig
 	}
 
@@ -187,6 +200,41 @@ func buildWriteRequestForInvoiceConfig(storeId *string, utcTimeStamp *int64, inv
 	return writeRequest, nil
 }
 
+func buildWriteRequestForSequenceConfig(storeId *string, utcTimeStamp *int64, sequenceConfigs *[]*model.SequenceEntity, writeRequest []*dynamodb.WriteRequest) ([]*dynamodb.WriteRequest, *ServiceError) {
+	pk := "STORE#" + *storeId
+	sk := configType + "#" + sequenceConfigType
+	// Convert the item to DynamoDB AttributeValues
+
+	sequences := make(map[string]*model.SequenceEntity)
+
+	for _, seqConfig := range *sequenceConfigs {
+		sequences[*seqConfig.Name] = seqConfig
+	}
+
+	dao := model.SequenceEntityDao{
+		PK:              &pk,
+		SK:              &sk,
+		GPK1:            storeId,
+		GSK1:            utcTimeStamp,
+		Type:            &sequenceConfigType,
+		SequenceEntitys: &sequences,
+	}
+
+	av, err := dynamodbattribute.MarshalMap(dao)
+	if err != nil {
+		return nil, &ServiceError{
+			ErrorCode:    "500",
+			ErrorMessage: "Error Unparsing input request",
+		}
+	}
+	writeRequest = append(writeRequest, &dynamodb.WriteRequest{
+		PutRequest: &dynamodb.PutRequest{
+			Item: av,
+		},
+	})
+	return writeRequest, nil
+}
+
 func (sr *SyncRepository) UpdateSyncData(storeId string, req *UpdateSyncRequest) (*UpdateSyncResponse, *ServiceError) {
 	db := GetDynamoDbClient()
 
@@ -195,14 +243,20 @@ func (sr *SyncRepository) UpdateSyncData(storeId string, req *UpdateSyncRequest)
 	//Convert the item to DynamoDB AttributeValues
 	var writeRequest []*dynamodb.WriteRequest
 
+	response := &UpdateSyncResponse{
+		LastSyncedAt: &utcTimeStamp,
+	}
+
 	// For each transaction request create a write request
-	writeRequest, err := buildWriteRequestForTransaction(&storeId, &utcTimeStamp, req.Transactions, writeRequest)
-	if err != nil {
-		return nil, err
+	tran, tranErr := BuildWriteRequestForTransaction(&storeId, &utcTimeStamp, req.Transactions)
+	response.Transactions = &SyncResponse{
+		Data:         tran,
+		Error:        tranErr,
+		LastSyncedAt: &utcTimeStamp,
 	}
 
 	// For each product request create a write request
-	writeRequest, err = buildWriteRequestForProducts(&storeId, &utcTimeStamp, req.Products, writeRequest)
+	writeRequest, err := buildWriteRequestForProducts(&storeId, &utcTimeStamp, req.Products, writeRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +269,7 @@ func (sr *SyncRepository) UpdateSyncData(storeId string, req *UpdateSyncRequest)
 
 	// Create Request for config element.
 	if req.Config != nil {
-		if req.Config.TaxConfig != nil {
+		if req.Config.TaxConfig != nil && len(*req.Config.TaxConfig) > 0 {
 			writeRequest, err = buildWriteRequestForTaxConfig(&storeId, &utcTimeStamp, req.Config.TaxConfig, writeRequest)
 		}
 	}
@@ -223,6 +277,12 @@ func (sr *SyncRepository) UpdateSyncData(storeId string, req *UpdateSyncRequest)
 	if req.Config != nil {
 		if req.Config.InvoiceConfig != nil {
 			writeRequest, err = buildWriteRequestForInvoiceConfig(&storeId, &utcTimeStamp, req.Config.InvoiceConfig, writeRequest)
+		}
+	}
+
+	if req.Config != nil {
+		if req.Config.SequenceConfig != nil {
+			writeRequest, err = buildWriteRequestForSequenceConfig(&storeId, &utcTimeStamp, req.Config.SequenceConfig, writeRequest)
 		}
 	}
 
@@ -247,9 +307,7 @@ func (sr *SyncRepository) UpdateSyncData(storeId string, req *UpdateSyncRequest)
 		}
 	}
 
-	return &UpdateSyncResponse{
-		LastSyncedAt: &utcTimeStamp,
-	}, nil
+	return response, nil
 }
 
 func (sr *SyncRepository) GetSyncData(storeId string, from *int64, to *int64) (*GetSyncResponse, *ServiceError) {
@@ -300,6 +358,7 @@ func (sr *SyncRepository) GetSyncData(storeId string, from *int64, to *int64) (*
 	var transactions []*model.TransactionHeaderEntity
 	var taxGroups []*model.TaxGroupEntity
 	var invoiceConfig []*model.ReportConfigEntity
+	var sequenceConfig []*model.SequenceEntity
 
 	for _, item := range res.Items {
 		typ := item["Type"].S
@@ -328,6 +387,15 @@ func (sr *SyncRepository) GetSyncData(storeId string, from *int64, to *int64) (*
 			var tp *model.ReportConfigEntity
 			_ = dynamodbattribute.UnmarshalMap(item, &tp)
 			invoiceConfig = append(invoiceConfig, tp)
+		} else if *typ == sequenceConfigType {
+			var tp *model.SequenceEntityDao
+			_ = dynamodbattribute.UnmarshalMap(item, &tp)
+
+			if tp != nil && tp.SequenceEntitys != nil {
+				for _, sequence := range *tp.SequenceEntitys {
+					sequenceConfig = append(sequenceConfig, sequence)
+				}
+			}
 		}
 	}
 
@@ -355,6 +423,11 @@ func (sr *SyncRepository) GetSyncData(storeId string, from *int64, to *int64) (*
 			},
 			InvoiceConfig: SyncData{
 				Data: &invoiceConfig,
+				From: from,
+				To:   to,
+			},
+			SequenceConfig: SyncData{
+				Data: &sequenceConfig,
 				From: from,
 				To:   to,
 			},

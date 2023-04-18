@@ -17,6 +17,8 @@ var (
 )
 
 func GetBusinessByIdHandler(ctx context.Context, event events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	eventJson, _ := json.Marshal(event)
+	log.Printf("EVENT: %s", eventJson)
 
 	pathParams := event.PathParameters
 	bId := pathParams["businessId"]

@@ -24,6 +24,7 @@ func UpdateSyncHandler(ctx context.Context, event events.APIGatewayProxyRequest)
 	err := json.Unmarshal([]byte(event.Body), &req)
 
 	if err != nil {
+		log.Printf("ERROR: %s", err)
 		return events.APIGatewayProxyResponse{
 			StatusCode:      500,
 			Headers:         nil,

@@ -6,10 +6,9 @@ class SharpService {
         this.sharp = sharp
     }
 
-    async convertImage(imageData, imagesSize) {
+    async convertImage(imageData, quality = 50) {
         return await this.sharp(imageData)
-            .resize(imagesSize[0], imagesSize[1])
-            .jpeg({ progressive: true })
+            .png({lossless: true, quality: quality})
             .toBuffer()
     }
 

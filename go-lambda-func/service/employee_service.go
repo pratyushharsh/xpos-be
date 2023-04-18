@@ -118,7 +118,6 @@ func (e *EmployeeRepository) CreateNewEmployeeForStore(req *StoreEmployeeRoleDao
 	}
 
 	log.Println(item)
-
 	return req.StoreEmployeeRole, nil
 }
 

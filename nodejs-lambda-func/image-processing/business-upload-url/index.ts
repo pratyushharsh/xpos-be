@@ -1,4 +1,4 @@
-import { APIGatewayProxyEventV2 } from 'aws-lambda';
+import {APIGatewayProxyEventV2} from 'aws-lambda';
 import AWS from 'aws-sdk';
 
 const s3 = new AWS.S3()
@@ -33,9 +33,8 @@ async function checkIfBusinessExist(businessId: string) {
 
 exports.handler = async (event: APIGatewayProxyEventV2) => {
 
-    const { businessId } = event.pathParameters!
-    const Key = `${BUCKET_PREFIX}/${businessId}/LOGO.jpg`
-
+    console.log(event);
+    const {businessId} = event.pathParameters!
 
     // Check if the business exist
     let exist = await checkIfBusinessExist(businessId!);
@@ -48,30 +47,48 @@ exports.handler = async (event: APIGatewayProxyEventV2) => {
         }
     }
 
-    // Get signed URL fro zS3
-    const s3Params = {
+    if (!event.queryStringParameters || !event.queryStringParameters.type) {
+        return {
+            statusCode: 400,
+            body: JSON.stringify({
+                "message": "query param type is required."
+            })
+        }
+    }
+
+    // Use Query parameter to get the corresponding signed url.
+    const {type, fileName} = event.queryStringParameters!
+
+    let s3Params = {
         Bucket: IMAGE_IMAGE_BUCKET,
-        Key,
+        Key: '',
         Expires: URL_EXPIRATION_SECONDS,
         ContentType: 'image/jpeg',
     }
-    try {
-        const uploadURL = await s3.getSignedUrlPromise('putObject', s3Params)
 
-        return {
-            statusCode: 200,
-            body: JSON.stringify({
-                uploadURL: uploadURL,
-                filename: Key
-            })
-        }
-    } catch (e) {
-        console.error(e);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({
-                "message": "Unable to generate Url"
-            })
-        }
+    switch (type) {
+        case 'logo':
+            s3Params.Key = `${BUCKET_PREFIX}/${businessId}/logo/logo.jpg`
+            break;
+        case 'bulkProductImage':
+            s3Params.ContentType = 'multipart/x-zip'
+            s3Params.Key = `${BUCKET_PREFIX}/${businessId}/bulkProductImage/${fileName || `${Date.now()}.zip`}`
+            break;
+        default:
+            return {
+                statusCode: 400,
+                body: JSON.stringify({
+                    "message": "Invalid type"
+                })
+            }
+    }
+
+    const uploadURL = await s3.getSignedUrlPromise('putObject', s3Params)
+    return {
+        statusCode: 200,
+        body: JSON.stringify({
+            uploadURL: uploadURL,
+            filename: s3Params.Key
+        })
     }
 }

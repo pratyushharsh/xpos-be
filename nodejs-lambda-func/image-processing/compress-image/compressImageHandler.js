@@ -17,13 +17,10 @@ const imageSizes = {
     content: [274, 377]
 }
 
-async function convertImage(imageData, key, size) {
-    if (!await sharpService.isValidSize(imageData, size)) {
-        const errorMessage = `Cannot resize ${key}. The original height or width is less than the desired values of [${size}]`
-        console.error(errorMessage)
-        return { statusCode: 500, body: JSON.stringify({ message: errorMessage }) }
-    }
-    const convertedImageData = await sharpService.convertImage(imageData, size)
+async function convertImage(imageData, quality) {
+    const convertedImageData = await sharpService.convertImage(imageData, quality)
+
+    // Build and return the image key.
     const image_key = `${key.split('.').slice(0, -1).join('.')}_${size[0]}x${size[1]}.jpg`
     await s3Service.saveImage(OUTPUT_BUCKET, `${image_key}`, convertedImageData)
 
@@ -48,9 +45,7 @@ async function insertLogoIntoDynamoDb(images, store_id) {
             },
             ExpressionAttributeValues: {
                 ":logo": {
-                    small: `https://${OUTPUT_BUCKET}.s3.ap-south-1.amazonaws.com/${await images[0]}`,
-                    medium: `https://${OUTPUT_BUCKET}.s3.ap-south-1.amazonaws.com/${await images[1]}`,
-                    large: `https://${OUTPUT_BUCKET}.s3.ap-south-1.amazonaws.com/${await images[2]}`,
+                    small: `https://${OUTPUT_BUCKET}.s3.ap-south-1.amazonaws.com/${await images[0]}`
                 },
             },
             ReturnValues:"UPDATED_NEW"
@@ -72,9 +67,7 @@ async function processRecord(record) {
 
         // Process Record According To The Type of data
         const QUEUE = []
-        QUEUE.push(convertImage(imageData, "out/" + record.s3.object.key, imageSizes.logo_small))
         QUEUE.push(convertImage(imageData, "out/" + record.s3.object.key, imageSizes.logo_medium))
-        QUEUE.push(convertImage(imageData, "out/" + record.s3.object.key, imageSizes.logo_large))
         await Promise.all(QUEUE);
         // insert into dynamodb
         await insertLogoIntoDynamoDb(QUEUE, splitPath[1])

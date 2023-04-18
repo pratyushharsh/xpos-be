@@ -8,8 +8,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	awscdklambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awss3notifications"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awslogs"
 	awscdklambdago "github.com/aws/aws-cdk-go/awscdklambdagoalpha/v2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -69,6 +68,16 @@ func main() {
 		},
 		RoleName: globalRole,
 	})
+
+	//NewImageStack(app, StackPrefix+"ImageStack", &ImageStackProps{
+	//	StackProps: awscdk.StackProps{
+	//		Env: env(),
+	//		Tags: &map[string]*string{
+	//			"Project": jsii.String(ProjectTag),
+	//		},
+	//	},
+	//	RoleName: globalRole,
+	//})
 
 	app.Synth(nil)
 }
@@ -153,6 +162,15 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 		MemorySize:   jsii.Number(128),
 		Role:         role,
 	})
+	//
+	//preTokenGenerationLambda := awscdklambdanodejs.NewNodejsFunction(userStack, jsii.String(ProjectPrefix+"PreTokenGeneration"), &awscdklambdanodejs.NodejsFunctionProps{
+	//	FunctionName: jsii.String(ProjectPrefix + "PreTokenGeneration"),
+	//	Entry:        jsii.String("../nodejs-lambda-func/auth/pre-token-generation-trigger/index.ts"),
+	//	Handler:      jsii.String("handler"),
+	//	Runtime:      awslambda.Runtime_NODEJS_16_X(),
+	//	MemorySize:   jsii.Number(128),
+	//	Role:         role,
+	//})
 
 	userPool := awscognito.NewUserPool(userStack, jsii.String(ProjectPrefix+"UserPool"), &awscognito.UserPoolProps{
 		UserPoolName:      jsii.String(ProjectPrefix + "UserPool"),
@@ -180,14 +198,45 @@ func NewUserStack(scope constructs.Construct, id string, props *UserStackProps) 
 		},
 	})
 
+
 	userPool.AddTrigger(awscognito.UserPoolOperation_PRE_SIGN_UP(), preSignUpLambda)
 	userPool.AddTrigger(awscognito.UserPoolOperation_CREATE_AUTH_CHALLENGE(), createAuthChallangeLambda)
 	userPool.AddTrigger(awscognito.UserPoolOperation_DEFINE_AUTH_CHALLENGE(), defineAuthChallange)
 	userPool.AddTrigger(awscognito.UserPoolOperation_VERIFY_AUTH_CHALLENGE_RESPONSE(), verifyAuthChallenge)
+	//userPool.AddTrigger(awscognito.UserPoolOperation_PRE_TOKEN_GENERATION(), preTokenGenerationLambda)
+
+	resourceScope := awscognito.NewResourceServerScope(&awscognito.ResourceServerScopeProps{
+		ScopeName: jsii.String("xpos"),
+		ScopeDescription: jsii.String("It will have access to all the api related to xpos"),
+	})
+
+	resourceServer := awscognito.NewUserPoolResourceServer(userStack, jsii.String(ProjectPrefix+"ResourceServer"), &awscognito.UserPoolResourceServerProps{
+		Identifier:                 jsii.String(ProjectPrefix+"AppClientResourceServer"),
+		Scopes:                     &[]awscognito.ResourceServerScope{
+			resourceScope,
+		},
+		UserPoolResourceServerName: jsii.String("xpos-resource-server"),
+		UserPool:                   userPool,
+	})
 
 	userPool.AddClient(jsii.String(ProjectPrefix+"MobileApp"), &awscognito.UserPoolClientOptions{
 		GenerateSecret:     jsii.Bool(false),
 		UserPoolClientName: jsii.String(ProjectPrefix + "MobileApp"),
+		OAuth: &awscognito.OAuthSettings{
+			Scopes: &[]awscognito.OAuthScope{
+				awscognito.OAuthScope_ResourceServer(resourceServer, resourceScope),
+			},
+		},
+	})
+
+	userPool.AddClient(jsii.String(ProjectPrefix+"IOSMobileApp"), &awscognito.UserPoolClientOptions{
+		GenerateSecret:     jsii.Bool(false),
+		UserPoolClientName: jsii.String(ProjectPrefix + "IOSMobileApp"),
+		OAuth: &awscognito.OAuthSettings{
+			Scopes: &[]awscognito.OAuthScope{
+				awscognito.OAuthScope_ResourceServer(resourceServer, resourceScope),
+			},
+		},
 	})
 
 	userStack.ExportValue(userPool.UserPoolId(), &awscdk.ExportValueOptions{
@@ -219,7 +268,14 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Deploy: jsii.Bool(false),
 	})
 
-	lambdaLayers := awslambda.LayerVersion_FromLayerVersionArn(businessStack, jsii.String(ProjectPrefix+"DependencyLayer"), jsii.String("arn:aws:lambda:ap-south-1:189468856814:layer:XPOSDependencyLayer:3"))
+	authorizer := awscdkrest.NewCognitoUserPoolsAuthorizer(businessStack, jsii.String("XPOS-POC-Authorizer"), &awscdkrest.CognitoUserPoolsAuthorizerProps{
+		IdentitySource: jsii.String("method.request.header.Authorizer"),
+		CognitoUserPools: &[]awscognito.IUserPool{
+			awscognito.UserPool_FromUserPoolId(businessStack, jsii.String("XPOS-POC-UserPool-Authorizer"), awscdk.Fn_ImportValue(jsii.String(ProjectPrefix+"UserPool"))),
+		},
+	})
+
+	//lambdaLayers := awslambda.LayerVersion_FromLayerVersionArn(businessStack, jsii.String(ProjectPrefix+"DependencyLayer"), jsii.String("arn:aws:lambda:ap-south-1:189468856814:layer:XPOSDependencyLayer:3"))
 	//lambdaLayers := awslambda.NewLayerVersion(businessStack, jsii.String("MyLayer"), &awslambda.LayerVersionProps{
 	//  	RemovalPolicy: awscdk.RemovalPolicy_RETAIN,
 	//  	Code: awslambda.AssetCode,
@@ -244,6 +300,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	createNewBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"CreateNewBusinessLambda"), &awscdklambdago.GoFunctionProps{
@@ -254,6 +311,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	updateBusinessLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"UpdateBusinessLambda"), &awscdklambdago.GoFunctionProps{
@@ -264,9 +322,12 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	businessPath := restApi.Root().AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
+
+	storePath := restApi.Root().AddResource(jsii.String("store"), &awscdkrest.ResourceOptions{})
 
 	// Handler for: POST /business/
 	businessPath.AddMethod(jsii.String("POST"), awscdkrest.NewLambdaIntegration(createNewBusinessLambda, &awscdkrest.LambdaIntegrationOptions{
@@ -278,13 +339,52 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		DefaultMethodOptions: nil,
 	})
 
+	storeId := storePath.AddResource(jsii.String("{businessId}"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
 	// Handler for: GET /business/{businessId}
 	businessId.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getBusinessByIdLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{
+		Authorizer: authorizer,
+	})
+
+	// Handler for: GET /store/{businessId}
+	storeId.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getBusinessByIdLambda, &awscdkrest.LambdaIntegrationOptions{
 		Proxy: jsii.Bool(true),
 	}), &awscdkrest.MethodOptions{})
 
 	// Handler for updating business detail: PUT /business/{businessId}
 	businessId.AddMethod(jsii.String("PUT"), awscdkrest.NewLambdaIntegration(updateBusinessLambda, &awscdkrest.LambdaIntegrationOptions{
+		Proxy: jsii.Bool(true),
+	}), &awscdkrest.MethodOptions{})
+
+	// Create signature for uploading the image url.
+	businessImage := businessId.AddResource(jsii.String("image"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	businessImageToken := businessImage.AddResource(jsii.String("token"), &awscdkrest.ResourceOptions{
+		DefaultIntegration:   nil,
+		DefaultMethodOptions: nil,
+	})
+
+	businessImageTokenLambda := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"BusinessImageTokenLambda"), &awscdklambdago.GoFunctionProps{
+		FunctionName: jsii.String(ProjectPrefix + "BusinessImageTokenLambda"),
+		Description:  jsii.String("Generate Token to upload image."),
+		Entry:        jsii.String("../go-lambda-func/imagekit-token"),
+		Role:         role,
+		Runtime:      awslambda.Runtime_GO_1_X(),
+		MemorySize:   jsii.Number(128),
+		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_THREE_DAYS,
+	})
+
+	// Get token to upload image url: GET /business/{businessId}/image/token
+	businessImageToken.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(businessImageTokenLambda, &awscdkrest.LambdaIntegrationOptions{
 		Proxy: jsii.Bool(true),
 	}), &awscdkrest.MethodOptions{})
 
@@ -301,6 +401,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 			"IMAGE_IMAGE_BUCKET":     jsii.String("xpos-image-stage"),
 			"BUCKET_PREFIX":          jsii.String("parchi"),
 		}),
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	// Create Sync Service
@@ -318,6 +419,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	syncService.AddMethod(jsii.String("POST"), awscdkrest.NewLambdaIntegration(updateSyncLambda, &awscdkrest.LambdaIntegrationOptions{
@@ -333,6 +435,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	syncService.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getSyncLambda, &awscdkrest.LambdaIntegrationOptions{
@@ -359,6 +462,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	// Handler for: POST /business/{businessId}/settings/tax
@@ -370,6 +474,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	tax.AddMethod(jsii.String("GET"), awscdkrest.NewLambdaIntegration(getTaxForGroupForStoreLambda, &awscdkrest.LambdaIntegrationOptions{
@@ -391,34 +496,36 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 	}), &awscdkrest.MethodOptions{})
 
 	// Lambda for compressing the image and store in the S3 bucket
-	compressImageLambda := awscdklambdanodejs.NewNodejsFunction(businessStack, jsii.String(ProjectPrefix+"CompressImageLambda"), &awscdklambdanodejs.NodejsFunctionProps{
-		FunctionName: jsii.String(ProjectPrefix + "CompressImageLambda"),
-		Entry:        jsii.String("../nodejs-lambda-func/image-processing/compress-image/compressImageHandler.js"),
-		Handler:      jsii.String("main"),
-		Runtime:      awslambda.Runtime_NODEJS_16_X(),
-		MemorySize:   jsii.Number(256),
-		Role:         role,
-		Environment: mergeTwoMaps(lambdaEnvironmentVariable, &map[string]*string{
-			"INPUT_BUCKET":  jsii.String("xpos-image-stage"),
-			"OUTPUT_BUCKET": jsii.String("xpos-image"),
-		}),
-		Bundling: &awscdklambdanodejs.BundlingOptions{
-			ExternalModules: &[]*string{
-				jsii.String("aws-sdk"),
-				jsii.String("sharp"),
-			},
-		},
-		Layers: &[]awslambda.ILayerVersion{
-			lambdaLayers,
-		},
-	})
+	//compressImageLambda :=
+	//awscdklambdanodejs.NewNodejsFunction(businessStack, jsii.String(ProjectPrefix+"CompressImageLambda"), &awscdklambdanodejs.NodejsFunctionProps{
+	//	FunctionName: jsii.String(ProjectPrefix + "CompressImageLambda"),
+	//	Entry:        jsii.String("../nodejs-lambda-func/image-processing/compress-image/compressImageHandler.js"),
+	//	Handler:      jsii.String("main"),
+	//	Runtime:      awslambda.Runtime_NODEJS_16_X(),
+	//	MemorySize:   jsii.Number(256),
+	//	Role:         role,
+	//	Environment: mergeTwoMaps(lambdaEnvironmentVariable, &map[string]*string{
+	//		"INPUT_BUCKET":  jsii.String("xpos-image-stage"),
+	//		"OUTPUT_BUCKET": jsii.String("xpos-image"),
+	//	}),
+	//	Bundling: &awscdklambdanodejs.BundlingOptions{
+	//		ExternalModules: &[]*string{
+	//			jsii.String("aws-sdk"),
+	//			jsii.String("sharp"),
+	//		},
+	//	},
+	//	Layers: &[]awslambda.ILayerVersion{
+	//		lambdaLayers,
+	//	},
+	//	LogRetention: awslogs.RetentionDays_ONE_WEEK,
+	//})
 
-	inputImageBucket := awss3.Bucket_FromBucketName(businessStack, jsii.String("xpos-image-stage"), jsii.String("xpos-image-stage"))
-
-	// Create listener for the image upload notification
-	inputImageBucket.AddEventNotification(awss3.EventType_OBJECT_CREATED_PUT, awss3notifications.NewLambdaDestination(compressImageLambda), &awss3.NotificationKeyFilter{
-		Prefix: jsii.String("parchi/"),
-	})
+	//inputImageBucket := awss3.Bucket_FromBucketName(businessStack, jsii.String("xpos-image-stage"), jsii.String("xpos-image-stage"))
+	//////
+	////// Create listener for the image upload notification
+	//inputImageBucket.AddEventNotification(awss3.EventType_OBJECT_CREATED_PUT, awss3notifications.NewLambdaDestination(compressImageLambda), &awss3.NotificationKeyFilter{
+	//	Prefix: jsii.String("parchi/"),
+	//})
 
 	// User Stack Creating new business and new user
 	getEmployeeFromBusiness := awscdklambdago.NewGoFunction(businessStack, jsii.String(ProjectPrefix+"GetEmployeeFromBusiness"), &awscdklambdago.GoFunctionProps{
@@ -429,6 +536,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	businessEmpApi := businessId.AddResource(jsii.String("employee"), &awscdkrest.ResourceOptions{
@@ -450,6 +558,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	// Handler for: POST /business/{businessId}/employee
@@ -466,6 +575,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	businessUserApi := businessEmpApi.AddResource(jsii.String("{userid}"), &awscdkrest.ResourceOptions{
@@ -489,6 +599,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	userIdPath := userPath.AddResource(jsii.String("{userid}"), &awscdkrest.ResourceOptions{})
@@ -507,6 +618,7 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 		Runtime:      awslambda.Runtime_GO_1_X(),
 		MemorySize:   jsii.Number(128),
 		Environment:  lambdaEnvironmentVariable,
+		LogRetention: awslogs.RetentionDays_ONE_WEEK,
 	})
 
 	userBusiness := userIdPath.AddResource(jsii.String("business"), &awscdkrest.ResourceOptions{})
@@ -517,4 +629,100 @@ func NewBusinessStack(scope constructs.Construct, id string, props *BusinessStac
 	}), &awscdkrest.MethodOptions{})
 
 	return businessStack
+}
+
+type ImageStackProps struct {
+	awscdk.StackProps
+	RoleName *string
+}
+
+func NewImageStack(scope constructs.Construct, id string, props *ImageStackProps) awscdk.Stack {
+	var stackProps awscdk.StackProps
+	if props != nil {
+		stackProps = props.StackProps
+	}
+	imageStack := awscdk.NewStack(scope, &id, &stackProps)
+
+	//lambdaEnvironmentVariable := &map[string]*string{
+	//	"DBTable":   jsii.String("XPOS_DEV"),
+	//	"DataTable": jsii.String("XPOS_DATA"),
+	//	//"CognitoUserPool": jsii.String("ap-south-1_gXgaeT7lu"),
+	//	"CognitoUserPool": awscdk.Fn_ImportValue(jsii.String(ProjectPrefix + "UserPool")),
+	//}
+
+	//lambdaLayers := awslambda.LayerVersion_FromLayerVersionArn(imageStack, jsii.String(ProjectPrefix+"DependencyLayer"), jsii.String("arn:aws:lambda:ap-south-1:189468856814:layer:XPOSDependencyLayer:3"))
+
+	// Role that needs to be attached to the lambda function
+	//role := awsiam.Role_FromRoleName(imageStack, jsii.String("Role"), props.RoleName, &awsiam.FromRoleNameOptions{
+	//	Mutable: jsii.Bool(false),
+	//})
+
+	//imageDlq := awscdksqs.NewQueue(imageStack, jsii.String(ProjectPrefix+"ZipImageDLQ"), &awscdksqs.QueueProps{
+	//	QueueName: jsii.String(ProjectPrefix + "ZipImageDLQ"),
+	//})
+	//
+	//imageSqs := awscdksqs.NewQueue(imageStack, jsii.String(ProjectPrefix+"ZipImageQ"), &awscdksqs.QueueProps{
+	//	QueueName: jsii.String(ProjectPrefix + "ZipImageQ"),
+	//	DeadLetterQueue: &awscdksqs.DeadLetterQueue{
+	//		MaxReceiveCount: jsii.Number(2),
+	//		Queue:           imageDlq,
+	//	},
+	//})
+
+	//inputImageBucket := awss3.Bucket_FromBucketName(imageStack, jsii.String("xpos-image-stage"), jsii.String("xpos-image-stage"))
+
+	//inputImageBucket.AddEventNotification(awss3.EventType_OBJECT_CREATED_PUT, awss3notifications.NewSqsDestination(imageSqs), &awss3.NotificationKeyFilter{
+	//	Prefix: jsii.String("fileImport/"),
+	//	Suffix: jsii.String(".zip"),
+	//})
+
+	// Add the lambda function to read the s3 file and extract it
+	//extractS3ImageLambda := awscdklambdago.NewGoFunction(imageStack, jsii.String(ProjectPrefix+"ExtractZipFileLambda"), &awscdklambdago.GoFunctionProps{
+	//	FunctionName: jsii.String(ProjectPrefix + "ExtractZipFileLambda"),
+	//	Description:  jsii.String("Extract zip files from s3 bucket."),
+	//	Entry:        jsii.String("../go-lambda-func/s3-extract-zip"),
+	//	Role:         role,
+	//	Runtime:      awslambda.Runtime_GO_1_X(),
+	//	MemorySize:   jsii.Number(128),
+	//	Timeout:      awscdk.Duration_Seconds(jsii.Number(300)),
+	//	LogRetention: awslogs.RetentionDays_ONE_WEEK,
+	//})
+
+	//sqsEventSource := awslambdaeventsources.NewSqsEventSource(imageSqs, &awslambdaeventsources.SqsEventSourceProps{
+	//	BatchSize: jsii.Number(1),
+	//	Enabled:   jsii.Bool(true),
+	//})
+	//
+	//extractS3ImageLambda.AddEventSource(sqsEventSource)
+
+	//compressImageLambda := awscdklambdanodejs.NewNodejsFunction(imageStack, jsii.String(ProjectPrefix+"ImageCompressorLambda"), &awscdklambdanodejs.NodejsFunctionProps{
+	//	FunctionName: jsii.String(ProjectPrefix + "ImageCompressorLambda"),
+	//	Entry:        jsii.String("../nodejs-lambda-func/image-processing/compress-image/compress_images.ts"),
+	//	Handler:      jsii.String("handler"),
+	//	Runtime:      awslambda.Runtime_NODEJS_16_X(),
+	//	MemorySize:   jsii.Number(256),
+	//	Timeout:      awscdk.Duration_Seconds(jsii.Number(120)),
+	//	Role:         role,
+	//	Environment: &map[string]*string{
+	//		"OUT_IMAGE_QUALITY": jsii.String("50"),
+	//		"TARGET_BUCKET":     jsii.String("xpos-image"),
+	//	},
+	//	Bundling: &awscdklambdanodejs.BundlingOptions{
+	//		ExternalModules: &[]*string{
+	//			jsii.String("aws-sdk"),
+	//			jsii.String("sharp"),
+	//		},
+	//	},
+	//	Layers: &[]awslambda.ILayerVersion{
+	//		lambdaLayers,
+	//	},
+	//	LogRetention: awslogs.RetentionDays_ONE_WEEK,
+	//})
+	//
+	////// Create listener for the image upload notification
+	//inputImageBucket.AddEventNotification(awss3.EventType_OBJECT_CREATED_PUT, awss3notifications.NewLambdaDestination(compressImageLambda), &awss3.NotificationKeyFilter{
+	//	Prefix: jsii.String("output-zip/"),
+	//})
+
+	return imageStack
 }

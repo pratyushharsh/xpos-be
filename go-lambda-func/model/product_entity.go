@@ -26,6 +26,8 @@ type ProductEntity struct {
 	SkuId         *string   `json:"skuId"`
 	StoreId       *string   `json:"storeId"`
 	TaxGroupId    *string   `json:"taxGroupId"`
+	Size          *string   `json:"size"`
+	Color         *string   `json:"color"`
 	Uom           *string   `json:"uom"`
 	LastChangedAt *int64    `json:"lastChangedAt"`
 }
